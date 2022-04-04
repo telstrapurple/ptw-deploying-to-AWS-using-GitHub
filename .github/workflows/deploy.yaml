@@ -1,0 +1,58 @@
+name: Deploy
+
+# Trigger this Workflow when something is a Push is made to the main Branch.
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    # Environment variables that can be used by any Step in this Job.
+    env:
+      AWS_ACCOUNT_ID: 157153681450
+      AWS_REGION: ap-southeast-2
+    # TODO:
+    permissions:
+      id-token: write # Allows this Job to update the ID Token when it authenticates to AWS.
+      contents: write # Required for checkout
+    # The Steps / actions that will be run in this Job.
+    steps:
+      # Checkout code into the Job workspace
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      # Install node into the Job workspace
+      - name: Install Node 14.x
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+
+      # Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # Build the code
+      - name: Build
+        run: npm run build
+
+      # Set up AWS credentials
+      - name: Login to AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/GitHubDeploymentRole
+          role-session-name: GitHubDeploymentRole-Session
+          aws-region: ${{ env.AWS_REGION }}
+          role-duration-seconds: 3600
+
+      # Bootstrap CDK
+      - name: Bootstrap CDK
+        run: |
+          npm run cdk bootstrap aws://${{ env.AWS_ACCOUNT_ID }}/us-east-1 && \
+          npm run cdk bootstrap aws://${{ env.AWS_ACCOUNT_ID }}/${{ env.AWS_REGION }}
+
+      # Deploy!
+      - name: Deploy via CDK
+        run: npm run cdk deploy -- --ci --require-approval never '*'
