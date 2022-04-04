@@ -1,0 +1,35 @@
+Parameters:
+  FullRepoName:
+    Type: String
+    Default: telstrapurple/ptw-deploying-to-AWS-using-GitHub
+  AWSAccountID:
+    Type: String
+
+Resources:
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: GitHubDeploymentRole
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRoleWithWebIdentity
+            Principal:
+              Federated: 
+                Ref: GithubOidc
+            Condition:
+              StringLike:
+                token.actions.githubusercontent.com:sub:
+                    Fn::Sub: repo:${FullRepoName}:*
+
+  GithubOidc:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ThumbprintList: [6938fd4d98bab03faadb97b34396831e3780aea1]
+      ClientIdList: 
+        - sts.amazonaws.com
+
+Outputs:
+  Role:
+    Value: !GetAtt Role.Arn 
